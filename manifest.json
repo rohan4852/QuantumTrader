@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "AITrader",
+    "name": "GhostTrader: AI Market Seer",
     "version": "1.0.0",
     "description": "Passive chart analysis assistant powered by Gemini AI",
     "permissions": [
