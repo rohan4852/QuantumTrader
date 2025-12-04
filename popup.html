@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AITrader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>AITrader</h1>
+            <p class="subtitle">Passive Chart Analysis</p>
+        </header>
+
+        <!-- API Key Input -->
+        <section class="section">
+            <label for="apiKey" class="label">Gemini API Key</label>
+            <div class="input-group">
+                <input type="password" id="apiKey" class="input" placeholder="Enter your Gemini API key"
+                    autocomplete="off">
+                <button id="toggleApiKey" class="toggle-btn" title="Show/Hide">👁️</button>
+            </div>
+            <small class="hint">Saved locally. Never sent anywhere except Google.</small>
+        </section>
+
+        <!-- Analyze Button -->
+        <button id="analyzeBtn" class="analyze-btn">ANALYZE CHART</button>
+        <div id="loadingSpinner" class="loading-spinner hidden"></div>
+
+        <!-- Result Display -->
+        <section class="section result-section hidden" id="resultSection">
+            <h2 class="result-title">Analysis Result</h2>
+            <div class="result-box">
+                <div id="decisionOutput" class="decision-text">BET UP</div>
+                <div id="confidencePercentageOutput" class="confidence-percentage">--</div>
+                <div class="result-details">
+                    <p><strong>Confidence:</strong> <span id="confidenceOutput">--</span></p>
+                    <p><strong>Reason:</strong> <span id="reasonOutput">--</span></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Error Display -->
+        <section class="section error-section hidden" id="errorSection">
+            <div class="error-box">
+                <p id="errorMessage"></p>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>v1.0.0 | Powered by Gemini API</p>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

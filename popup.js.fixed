@@ -1,0 +1,353 @@
+/**
+ * AITrader - Chrome Extension
+ * Passive Chart Analysis using Gemini AI
+ * Manifest V3 Compliant | No Content Script Injection
+ */
+
+// ============================================================================
+// SYSTEM PROMPT - Olymp Trade V2 Ultra-Precision Confluence
+// ============================================================================
+const SYSTEM_PROMPT = `You are an ultra-precise, systematic market analyst. You are emotionless and 100% data-driven. Your only job is to execute the following logic on the provided chart snapshot.
+
+CORE DIRECTIVE: Timeframe Lock
+Your first action is to identify the Timeframe (e.g., M1, M5, H1) from the provided screenshot. All analysis ('recent', 'short-term') is relative only to this timeframe. Your prediction is for the next 1-3 candles on this specific timeframe.
+
+STEP-BY-STEP ANALYSIS
+
+1. Trend Bias (Local Structure)
+Analyze the last 8-10 candles to determine the current structural bias.
+- Bullish Bias: Price is forming clear Higher Highs (HH) and Higher Lows (HL).
+- Bearish Bias: Price is forming clear Lower Highs (LH) and Lower Lows (LL).
+- Uncertain (Range): Price is alternating (e.g., HH but LL) or moving sideways. → Default to NO TRADE.
+
+2. Candle Dominance (Recent Momentum)
+Analyze the last 5 candles to identify the dominant side.
+- Buyer Dominance: ≥ 3 strong green candles with bodies significantly larger than their wicks.
+- Seller Dominance: ≥ 3 strong red candles with bodies significantly larger than their wicks.
+- Uncertain (Mixed): Colors alternate, or candles have small bodies (dojis, spinners). → Default to NO TRADE.
+
+3. Wick Rejection & Control (Last 3 Candles)
+Analyze the last 3 candles for signs of rejection or control at a key zone.
+- Bullish Rejection: Long lower wicks rejecting an obvious support level.
+- Bearish Rejection: Long upper wicks rejecting an obvious resistance level.
+- Bullish Control: Green bodies are growing and closing near their highs (minimal upper wicks).
+- Bearish Control: Red bodies are growing and closing near their lows (minimal lower wicks).
+- Uncertain (Indecision): Wicks are prominent on both sides. → Default to NO TRADE.
+
+4. Key Zone Check (Support/Resistance)
+Identify the nearest obvious Support (price floor) or Resistance (price ceiling) based on recent price turning points or wick clusters.
+- Is price at this zone and reacting (Step 3)?
+- Is price breaking out of this zone?
+- Is price trapped inside a choppy zone? → Default to NO TRADE.
+
+DECISION LOGIC (Confluence Check)
+You will only issue a trade signal if all four steps align perfectly. This is the filter for "max accuracy."
+
+✅ BET UP (High Confidence)
+- Trend: Bullish
+- Dominance: Buyer
+- Rejection/Control: Bullish (e.g., bounced from support OR strong bullish control breaking resistance)
+- Zone: Price is clearly respecting support or breaking resistance.
+
+✅ BET DOWN (High Confidence)
+- Trend: Bearish
+- Dominance: Seller
+- Rejection/Control: Bearish (e.g., rejected from resistance OR strong bearish control breaking support)
+- Zone: Price is clearly respecting resistance or breaking support.
+
+🚫 NO TRADE (Low Confidence)
+- If any signal contradicts the others. (e.g., Bullish Trend but Bearish Rejection).
+- If any signal is "Uncertain." (e.g., Ranging structure, Mixed dominance, or Indecision wicks).
+- If price is in the middle of a range, far from a key zone.
+
+OUTPUT FORMAT (JSON ONLY):
+{
+  "decision": "BET UP" or "BET DOWN" or "NO TRADE",
+  "confidence": "HIGH CONFIDENCE" or "LOW CONFIDENCE",
+  "confidencePercentage": 75,
+  "reason": "One-line synthesis of the 4-step confluence analysis"
+}`;
+
+// ============================================================================
+// DOM ELEMENTS
+// ============================================================================
+const DOM = {
+    apiKeyInput: document.getElementById('apiKey'),
+    toggleApiKeyBtn: document.getElementById('toggleApiKey'),
+    analyzeBtn: document.getElementById('analyzeBtn'),
+    loadingSpinner: document.getElementById('loadingSpinner'),
+    resultSection: document.getElementById('resultSection'),
+    decisionOutput: document.getElementById('decisionOutput'),
+    confidenceOutput: document.getElementById('confidenceOutput'),
+    confidencePercentageOutput: document.getElementById('confidencePercentageOutput'),
+    reasonOutput: document.getElementById('reasonOutput'),
+    errorSection: document.getElementById('errorSection'),
+    errorMessage: document.getElementById('errorMessage')
+};
+
+// ============================================================================
+// STORAGE MANAGEMENT
+// ============================================================================
+class StorageManager {
+    static async saveApiKey(apiKey) {
+        try {
+            await chrome.storage.local.set({ geminiApiKey: apiKey });
+        } catch (error) {
+            console.error('Error saving API key:', error);
+        }
+    }
+
+    static async loadApiKey() {
+        try {
+            const data = await chrome.storage.local.get('geminiApiKey');
+            return data.geminiApiKey || '';
+        } catch (error) {
+            console.error('Error loading API key:', error);
+            return '';
+        }
+    }
+}
+
+// ============================================================================
+// IMAGE CAPTURE
+// ============================================================================
+class ImageCapture {
+    static async captureVisibleTab() {
+        try {
+            const canvas = await html2canvas(document.body, {
+                allowTaint: true,
+                useCORS: true,
+                backgroundColor: '#ffffff'
+            });
+            return canvas.toDataURL('image/jpeg', 0.95);
+        } catch (error) {
+            // Fallback: use Chrome API if html2canvas not available
+            return await new Promise((resolve, reject) => {
+                chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 95 }, (dataUrl) => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve(dataUrl);
+                    }
+                });
+            });
+        }
+    }
+
+    static convertDataUrlToBase64(dataUrl) {
+        return dataUrl.split(',')[1];
+    }
+}
+
+// ============================================================================
+// GEMINI API
+// ============================================================================
+class GeminiAPI {
+    static async sendAnalysisRequest(apiKey, imageBase64) {
+        try {
+            if (!apiKey || apiKey.trim() === '') {
+                throw new Error('API Key is empty');
+            }
+
+            const payload = {
+                contents: [{
+                    parts: [
+                        {
+                            text: SYSTEM_PROMPT
+                        },
+                        {
+                            inline_data: {
+                                mime_type: 'image/jpeg',
+                                data: imageBase64
+                            }
+                        }
+                    ]
+                }]
+            };
+
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+            
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const message = errorData?.error?.message || `API Error: ${response.status} ${response.statusText}`;
+                throw new Error(message);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API Request Error:', error);
+            throw error;
+        }
+    }
+
+    static parseAnalysisResponse(apiResponse) {
+        try {
+            if (!apiResponse.candidates || apiResponse.candidates.length === 0) {
+                throw new Error('No response from API');
+            }
+
+            const textContent = apiResponse.candidates[0].content?.parts?.[0]?.text;
+            if (!textContent) {
+                throw new Error('Invalid response format');
+            }
+
+            // Extract JSON from the response (handles markdown code blocks)
+            const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('Could not parse JSON response');
+            }
+
+            const analysisResult = JSON.parse(jsonMatch[0]);
+
+            // Validate required fields
+            if (!analysisResult.decision || !analysisResult.confidence || !analysisResult.reason) {
+                throw new Error('Response missing required fields');
+            }
+
+            // Ensure confidencePercentage is a valid number if present
+            if (analysisResult.confidencePercentage !== undefined) {
+                analysisResult.confidencePercentage = parseInt(analysisResult.confidencePercentage, 10);
+                if (isNaN(analysisResult.confidencePercentage) || analysisResult.confidencePercentage < 0 || analysisResult.confidencePercentage > 100) {
+                    analysisResult.confidencePercentage = null;
+                }
+            }
+
+            return analysisResult;
+        } catch (error) {
+            console.error('Response Parsing Error:', error);
+            throw new Error(`Failed to parse analysis: ${error.message}`);
+        }
+    }
+}
+
+// ============================================================================
+// UI MANAGER
+// ============================================================================
+class UIManager {
+    static showError(message) {
+        DOM.errorMessage.textContent = message;
+        DOM.errorSection.classList.remove('hidden');
+        DOM.resultSection.classList.add('hidden');
+    }
+
+    static hideError() {
+        DOM.errorSection.classList.add('hidden');
+    }
+
+    static showLoading(show = true) {
+        if (show) {
+            DOM.loadingSpinner.classList.remove('hidden');
+            DOM.analyzeBtn.disabled = true;
+        } else {
+            DOM.loadingSpinner.classList.add('hidden');
+            DOM.analyzeBtn.disabled = false;
+        }
+    }
+
+    static displayResult(analysis) {
+        this.hideError();
+
+        // Determine result color class
+        const decisionLower = analysis.decision.toLowerCase();
+        let colorClass = 'bet-up';
+        if (decisionLower.includes('down')) {
+            colorClass = 'bet-down';
+        } else if (decisionLower.includes('no trade')) {
+            colorClass = 'no-trade';
+        }
+
+        DOM.decisionOutput.textContent = analysis.decision;
+        DOM.decisionOutput.className = `decision-text ${colorClass}`;
+        DOM.confidenceOutput.textContent = analysis.confidence;
+        
+        // Display confidence percentage if available
+        if (analysis.confidencePercentage) {
+            DOM.confidencePercentageOutput.textContent = `${analysis.confidencePercentage}%`;
+        } else {
+            DOM.confidencePercentageOutput.textContent = '--';
+        }
+        
+        DOM.reasonOutput.textContent = analysis.reason;
+
+        DOM.resultSection.classList.remove('hidden');
+    }
+}
+
+// ============================================================================
+// EVENT LISTENERS - Initialization
+// ============================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load saved API key
+    const savedApiKey = await StorageManager.loadApiKey();
+    if (savedApiKey) {
+        DOM.apiKeyInput.value = savedApiKey;
+    }
+});
+
+// ============================================================================
+// EVENT LISTENERS - API Key Management
+// ============================================================================
+DOM.apiKeyInput.addEventListener('change', async () => {
+    const apiKey = DOM.apiKeyInput.value.trim();
+    await StorageManager.saveApiKey(apiKey);
+});
+
+DOM.toggleApiKeyBtn.addEventListener('click', () => {
+    const inputType = DOM.apiKeyInput.type;
+    DOM.apiKeyInput.type = inputType === 'password' ? 'text' : 'password';
+    DOM.toggleApiKeyBtn.textContent = inputType === 'password' ? '🙈' : '👁️';
+});
+
+// ============================================================================
+// EVENT LISTENER - Analyze Button
+// ============================================================================
+DOM.analyzeBtn.addEventListener('click', async () => {
+    try {
+        UIManager.hideError();
+        UIManager.showLoading(true);
+        DOM.resultSection.classList.add('hidden');
+
+        // Validation
+        const apiKey = DOM.apiKeyInput.value.trim();
+        if (!apiKey) {
+            throw new Error('Please enter your Gemini API Key');
+        }
+
+        // Step 1: Capture the visible tab
+        console.log('Capturing visible tab...');
+        const imageDataUrl = await ImageCapture.captureVisibleTab();
+        const imageBase64 = ImageCapture.convertDataUrlToBase64(imageDataUrl);
+
+        // Step 2: Send to Gemini API
+        console.log('Sending analysis request to Gemini...');
+        const apiResponse = await GeminiAPI.sendAnalysisRequest(
+            apiKey,
+            imageBase64
+        );
+
+        // Step 3: Parse response
+        console.log('Parsing analysis response...');
+        const analysis = GeminiAPI.parseAnalysisResponse(apiResponse);
+
+        // Step 4: Display result
+        UIManager.displayResult(analysis);
+
+    } catch (error) {
+        console.error('Analysis Error:', error);
+        UIManager.showError(error.message || 'An unexpected error occurred');
+    } finally {
+        UIManager.showLoading(false);
+    }
+});
+
+// ============================================================================
+// DEBUG MODE (Optional - Remove in production)
+// ============================================================================
+console.log('AITrader Extension Loaded Successfully');
+console.log('Environment: Extension Popup | Manifest V3 | No Content Scripts');

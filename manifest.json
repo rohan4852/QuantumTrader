@@ -1,0 +1,18 @@
+{
+    "manifest_version": 3,
+    "name": "AITrader",
+    "version": "1.0.0",
+    "description": "Passive chart analysis assistant powered by Gemini AI",
+    "permissions": [
+        "activeTab",
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://generativelanguage.googleapis.com/*"
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "AITrader - Chart Analysis"
+    }
+}
