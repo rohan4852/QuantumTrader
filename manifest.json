@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "GhostTrader: AI Market Seer",
-    "version": "1.0.0",
-    "description": "Passive chart analysis assistant powered by the Ghost of Wall Street (Gemini AI).",
+    "name": "QuantumTrader: Advanced AI Market Analysis",
+    "version": "2.0.0",
+    "description": "Advanced quantitative trading analysis with video capture, multi-timeframe analysis, and market data integration for Olymp Trade.",
     "icons": {
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",
@@ -10,13 +10,22 @@
     },
     "permissions": [
         "activeTab",
-        "storage"
+        "storage",
+        "scripting",
+        "tabCapture",
+        "desktopCapture"
     ],
     "host_permissions": [
-        "https://generativelanguage.googleapis.com/*"
+        "https://generativelanguage.googleapis.com/*",
+        "https://olymptrade.com/*",
+        "https://*.olymptrade.com/*",
+        "https://finnhub.io/*"
     ],
     "action": {
         "default_popup": "popup.html",
-        "default_title": "GhostTrader"
+        "default_title": "QuantumTrader"
+    },
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'"
     }
 }

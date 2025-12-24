@@ -11,11 +11,11 @@
 <body>
     <div class="container">
         <header class="header">
-            <h1>GhostTrader</h1>
-            <p class="subtitle">AI Market Seer</p>
+            <h1>QuantumTrader</h1>
+            <p class="subtitle">Advanced AI Market Analysis</p>
         </header>
 
-        <!-- API Key Input -->
+        <!-- API Configuration -->
         <section class="section">
             <label for="apiKey" class="label">Gemini API Key</label>
             <div class="input-group">
@@ -26,21 +26,70 @@
             <small class="hint">Saved locally. Never sent anywhere except Google.</small>
         </section>
 
+        <!-- Live Market Data API Configuration -->
+        <section class="section">
+            <label for="marketDataApiKey" class="label">🔴 Live Market Data (Finnhub)</label>
+            <div class="input-group">
+                <input type="password" id="marketDataApiKey" class="input"
+                    placeholder="Finnhub API key for real-time data" autocomplete="off"
+                    value="d52k5hpr01qqu01vifsgd52k5hpr01qqu01vift0">
+                <button type="button" id="toggleMarketDataKey" class="toggle-btn" title="Show/Hide">👁️</button>
+            </div>
+            <small class="hint">🔴 LIVE: Real-time quotes, news, and indicators from Finnhub.io (60 calls/min
+                free)</small>
+        </section>
+
+
+
+        <!-- Trading Configuration -->
+        <section class="section">
+            <label for="timeframe" class="label">Primary Timeframe</label>
+            <select id="timeframe" class="input">
+                <option value="5m">5 Minutes</option>
+                <option value="15m">15 Minutes</option>
+                <option value="30m">30 Minutes</option>
+                <option value="1h" selected>1 Hour</option>
+                <option value="4h">4 Hours</option>
+                <option value="1d">1 Day</option>
+            </select>
+        </section>
+
+        <!-- Analysis Mode -->
+        <section class="section">
+            <label for="analysisMode" class="label">Analysis Mode</label>
+            <select id="analysisMode" class="input">
+                <option value="quantitative" selected>Quantitative Analysis</option>
+                <option value="hybrid">Hybrid (Quant + Visual)</option>
+                <option value="enhanced">Enhanced (with Market Data)</option>
+            </select>
+        </section>
+
+        <!-- Capture Mode -->
+        <section class="section">
+            <label for="captureMode" class="label">Capture Mode</label>
+            <select id="captureMode" class="input">
+                <option value="video" selected>Video (10 seconds)</option>
+                <option value="screenshot">Screenshot</option>
+                <option value="multi-frame">Multi-frame (5 captures)</option>
+            </select>
+        </section>
+
         <!-- Analyze Button -->
-        <button type="button" id="analyzeBtn" class="analyze-btn">SUMMON PREDICTION</button>
+        <button type="button" id="analyzeBtn" class="analyze-btn">🔮 QUANTUM ANALYSIS</button>
         <div id="loadingSpinner" class="loading-spinner hidden"></div>
 
         <!-- Result Display -->
         <section class="section result-section hidden" id="resultSection">
-            <h2 class="result-title">Analysis Result</h2>
+            <h2 class="result-title">Quantum Analysis Result</h2>
             <div class="result-box">
-                <div id="decisionOutput" class="decision-text">BET UP</div>
+                <div id="decisionOutput" class="decision-text">BUY</div>
                 <div id="confidencePercentageOutput" class="confidence-percentage">--</div>
                 <div class="result-details">
                     <p><strong>Confidence:</strong> <span id="confidenceOutput">--</span></p>
                     <p><strong>Reason:</strong> <span id="reasonOutput">--</span></p>
                 </div>
             </div>
+            <!-- Enhanced results will be dynamically added here -->
         </section>
 
         <!-- Error Display -->
@@ -52,7 +101,7 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>v1.0.0 | Powered by Gemini API</p>
+            <p>v2.0.0 | Quantum Analysis | Olymp Trade Optimized</p>
         </footer>
     </div>
 
