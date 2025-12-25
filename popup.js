@@ -1629,16 +1629,222 @@ class QuantumAnalysisOrchestrator {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             const url = tab.url?.toLowerCase() || '';
 
-            // Common forex pairs
-            const forexPairs = ['eurusd', 'gbpusd', 'usdjpy', 'audusd', 'usdcad', 'usdchf', 'nzdusd'];
+            // Comprehensive asset patterns for Olymp Trade
+            const assetPatterns = {
+                // Forex pairs
+                'eurusd': 'EURUSD',
+                'gbpusd': 'GBPUSD',
+                'usdjpy': 'USDJPY',
+                'audusd': 'AUDUSD',
+                'usdcad': 'USDCAD',
+                'usdchf': 'USDCHF',
+                'nzdusd': 'NZDUSD',
+                'eurjpy': 'EURJPY',
+                'gbpjpy': 'GBPJPY',
+                'eurgbp': 'EURGBP',
+                'audcad': 'AUDCAD',
+                'audchf': 'AUDCHF',
+                'audjpy': 'AUDJPY',
+                'cadchf': 'CADCHF',
+                'cadjpy': 'CADJPY',
+                'chfjpy': 'CHFJPY',
+                'euraud': 'EURAUD',
+                'eurcad': 'EURCAD',
+                'eurchf': 'EURCHF',
+                'gbpaud': 'GBPAUD',
+                'gbpcad': 'GBPCAD',
+                'gbpchf': 'GBPCHF',
+                'nzdcad': 'NZDCAD',
+                'nzdchf': 'NZDCHF',
+                'nzdjpy': 'NZDJPY',
 
-            for (const pair of forexPairs) {
-                if (url.includes(pair)) {
-                    return pair.toUpperCase();
+                // Cryptocurrencies
+                'btcusd': 'BTCUSD',
+                'bitcoin': 'BTCUSD',
+                'btc': 'BTCUSD',
+                'ethusd': 'ETHUSD',
+                'ethereum': 'ETHUSD',
+                'eth': 'ETHUSD',
+                'ltcusd': 'LTCUSD',
+                'litecoin': 'LTCUSD',
+                'ltc': 'LTCUSD',
+                'xrpusd': 'XRPUSD',
+                'ripple': 'XRPUSD',
+                'xrp': 'XRPUSD',
+                'adausd': 'ADAUSD',
+                'cardano': 'ADAUSD',
+                'ada': 'ADAUSD',
+                'dotusd': 'DOTUSD',
+                'polkadot': 'DOTUSD',
+                'dot': 'DOTUSD',
+
+                // Commodities
+                'xauusd': 'XAUUSD',
+                'gold': 'XAUUSD',
+                'xau': 'XAUUSD',
+                'xagusd': 'XAGUSD',
+                'silver': 'XAGUSD',
+                'xag': 'XAGUSD',
+                'oil': 'CRUDE_OIL',
+                'crude': 'CRUDE_OIL',
+                'wti': 'CRUDE_OIL',
+                'brent': 'BRENT_OIL',
+
+                // Stock Indices
+                'spx500': 'SPX500',
+                'sp500': 'SPX500',
+                's&p500': 'SPX500',
+                'nas100': 'NAS100',
+                'nasdaq': 'NAS100',
+                'dji30': 'DJI30',
+                'dow': 'DJI30',
+                'ftse100': 'FTSE100',
+                'dax30': 'DAX30',
+                'cac40': 'CAC40',
+                'nikkei': 'NIKKEI225',
+                'nikkei225': 'NIKKEI225',
+                'hangseng': 'HANGSENG',
+                'asx200': 'ASX200',
+                'tsx60': 'TSX60',
+
+                // Asian Indices
+                'asia': 'ASIA_COMPOSITE',
+                'asiacomposite': 'ASIA_COMPOSITE',
+                'asia_composite': 'ASIA_COMPOSITE',
+                'kospi': 'KOSPI',
+                'sensex': 'SENSEX',
+                'shangai': 'SHANGHAI_COMPOSITE',
+                'shanghai': 'SHANGHAI_COMPOSITE',
+                'shenzhen': 'SHENZHEN_COMPOSITE',
+                'taiwan': 'TAIWAN_WEIGHTED',
+                'jakarta': 'JAKARTA_COMPOSITE',
+                'kualalumpur': 'KLCI',
+                'singapore': 'STI',
+                'thailand': 'SET_INDEX',
+                'philippines': 'PSE_COMPOSITE',
+                'vietnam': 'VN_INDEX'
+            };
+
+            // Check URL for asset indicators
+            for (const [pattern, asset] of Object.entries(assetPatterns)) {
+                if (url.includes(pattern)) {
+                    console.log(`🎯 Asset detected from URL: ${asset} (pattern: ${pattern})`);
+                    return asset;
                 }
             }
 
-            // Default to EURUSD if no symbol detected
+            // Try to inject script to read asset from page content
+            try {
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    function: () => {
+                        // Try to find asset name in common Olymp Trade selectors
+                        const selectors = [
+                            '[data-asset]',
+                            '.asset-name',
+                            '.symbol-name',
+                            '.trading-pair',
+                            '.current-asset',
+                            '.asset-title',
+                            '.instrument-name',
+                            '.pair-name',
+                            '.symbol-text',
+                            '.asset-symbol'
+                        ];
+
+                        for (const selector of selectors) {
+                            const element = document.querySelector(selector);
+                            if (element) {
+                                const text = element.textContent || element.getAttribute('data-asset') || '';
+                                if (text.trim()) {
+                                    console.log(`Found asset in selector ${selector}: ${text}`);
+                                    return text.trim();
+                                }
+                            }
+                        }
+
+                        // Look for asset patterns in page text
+                        const bodyText = document.body.textContent || '';
+
+                        // Enhanced regex patterns for different asset types
+                        const patterns = [
+                            // Forex patterns
+                            /(EUR\/USD|GBP\/USD|USD\/JPY|AUD\/USD|USD\/CAD|USD\/CHF|NZD\/USD|EUR\/JPY|GBP\/JPY|EUR\/GBP)/i,
+                            // Crypto patterns  
+                            /(BTC\/USD|ETH\/USD|LTC\/USD|XRP\/USD|ADA\/USD|DOT\/USD|Bitcoin|Ethereum|Litecoin|Ripple|Cardano|Polkadot)/i,
+                            // Commodities
+                            /(XAU\/USD|XAG\/USD|Gold|Silver|Crude Oil|WTI|Brent)/i,
+                            // Indices
+                            /(S&P 500|SPX500|NASDAQ|NAS100|Dow Jones|DJI30|FTSE 100|DAX 30|CAC 40|Nikkei|Hang Seng|ASX 200)/i,
+                            // Asian indices
+                            /(Asia Composite|KOSPI|Sensex|Shanghai|Shenzhen|Taiwan|Jakarta|Kuala Lumpur|Singapore|Thailand|Philippines|Vietnam)/i
+                        ];
+
+                        for (const pattern of patterns) {
+                            const match = bodyText.match(pattern);
+                            if (match) {
+                                console.log(`Found asset pattern in page: ${match[1]}`);
+                                return match[1];
+                            }
+                        }
+
+                        // Look for specific text indicators
+                        const assetIndicators = [
+                            'Bitcoin', 'BTC', 'Ethereum', 'ETH', 'Litecoin', 'LTC',
+                            'Asia Composite', 'Asian Index', 'KOSPI', 'Nikkei', 'Hang Seng',
+                            'Gold', 'Silver', 'Crude Oil', 'S&P 500', 'NASDAQ', 'Dow Jones'
+                        ];
+
+                        for (const indicator of assetIndicators) {
+                            if (bodyText.includes(indicator)) {
+                                console.log(`Found asset indicator in page: ${indicator}`);
+                                return indicator;
+                            }
+                        }
+
+                        return null;
+                    }
+                });
+
+                if (results && results[0] && results[0].result) {
+                    const pageAsset = results[0].result.toLowerCase().trim();
+                    console.log(`🔍 Raw asset from page: "${pageAsset}"`);
+
+                    // Map page content to standard asset symbols
+                    for (const [pattern, asset] of Object.entries(assetPatterns)) {
+                        if (pageAsset.includes(pattern) || pattern.includes(pageAsset)) {
+                            console.log(`🎯 Asset mapped from page content: ${asset}`);
+                            return asset;
+                        }
+                    }
+
+                    // Direct mapping for common variations
+                    const directMappings = {
+                        'bitcoin': 'BTCUSD',
+                        'btc': 'BTCUSD',
+                        'ethereum': 'ETHUSD',
+                        'eth': 'ETHUSD',
+                        'asia composite': 'ASIA_COMPOSITE',
+                        'asian index': 'ASIA_COMPOSITE',
+                        'gold': 'XAUUSD',
+                        'silver': 'XAGUSD',
+                        's&p 500': 'SPX500',
+                        'nasdaq': 'NAS100',
+                        'nikkei': 'NIKKEI225',
+                        'hang seng': 'HANGSENG'
+                    };
+
+                    if (directMappings[pageAsset]) {
+                        console.log(`🎯 Asset mapped directly: ${directMappings[pageAsset]}`);
+                        return directMappings[pageAsset];
+                    }
+                }
+            } catch (scriptError) {
+                console.warn('Could not inject script to detect asset:', scriptError);
+            }
+
+            // Default to EURUSD if no asset detected
+            console.log('⚠️ No specific asset detected, defaulting to EURUSD');
             return 'EURUSD';
         } catch (error) {
             console.warn('Symbol detection failed:', error);
