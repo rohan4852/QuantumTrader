@@ -12,34 +12,124 @@
     <div class="container">
         <header class="header">
             <h1>QuantumTrader</h1>
-            <p class="subtitle">Advanced AI Market Analysis</p>
+            <p class="subtitle">RWA Tokenization Dashboard</p>
         </header>
 
-        <!-- API Configuration -->
+        <!-- Wallet / Network -->
         <section class="section">
-            <label for="apiKey" class="label">Gemini API Key</label>
+            <label class="label">Wallet Connect</label>
             <div class="input-group">
-                <input type="password" id="apiKey" class="input" placeholder="Enter your Gemini API key"
+                <div id="walletStatus" class="input" style="display:flex; align-items:center;">Disconnected</div>
+                <button type="button" id="connectWalletBtn" class="toggle-btn">Connect</button>
+            </div>
+            <small class="hint">This is a dev-friendly connection flow. If no injected wallet is visible, you can use
+                the private-key field below (local testing only).</small>
+        </section>
+
+        <section class="section">
+            <label for="rpcUrl" class="label">RPC URL</label>
+            <input type="text" id="rpcUrl" class="input" placeholder="http://127.0.0.1:8545" autocomplete="off">
+            <small class="hint">Default for local Hardhat: <code>http://127.0.0.1:8545</code></small>
+        </section>
+
+        <section class="section">
+            <label for="privateKey" class="label">Wallet Private Key (dev only)</label>
+            <div class="input-group">
+                <input type="password" id="privateKey" class="input" placeholder="0x..." autocomplete="off">
+                <button type="button" id="togglePrivateKey" class="toggle-btn" title="Show/Hide">👁️</button>
+            </div>
+            <small class="hint">Stored locally in <code>chrome.storage.local</code>. Do not use real keys.</small>
+        </section>
+
+        <!-- Contracts -->
+        <section class="section">
+            <label class="label">Contract Addresses</label>
+            <input type="text" id="registryAddress" class="input" placeholder="AssetRegistry address" autocomplete="off"
+                style="margin-bottom:8px;">
+            <input type="text" id="tokenAddress" class="input" placeholder="RealWorldAssetToken address"
+                autocomplete="off" style="margin-bottom:8px;">
+            <input type="text" id="marketplaceAddress" class="input" placeholder="Marketplace address"
+                autocomplete="off" style="margin-bottom:8px;">
+            <input type="text" id="usdcAddress" class="input" placeholder="USDC address (optional)" autocomplete="off">
+            <small class="hint">Paste deployed addresses from your Hardhat deploy output.</small>
+        </section>
+
+        <!-- Register new asset -->
+        <section class="section">
+            <label class="label">Register Asset (Issuer)</label>
+            <input type="text" id="detailsUri" class="input" placeholder="detailsURI (https://... or ipfs://...)"
+                autocomplete="off" style="margin-bottom:8px;">
+            <button type="button" id="registerAssetBtn" class="analyze-btn">REGISTER ASSET</button>
+        </section>
+
+        <!-- Assets -->
+        <section class="section">
+            <label for="assetSelect" class="label">Available RWA Assets</label>
+            <div class="input-group">
+                <select id="assetSelect" class="input"></select>
+                <button type="button" id="refreshAssetsBtn" class="toggle-btn">↻</button>
+            </div>
+            <small class="hint">Fetched from <code>AssetRegistry</code>.</small>
+        </section>
+
+        <!-- Buy -->
+        <section class="section">
+            <label class="label">Mint/Buy Fraction</label>
+            <div class="input-group" style="margin-bottom:8px;">
+                <input type="number" id="buyAmount" class="input" placeholder="Amount" min="1" step="1">
+                <select id="buyPayment" class="input" style="max-width:120px;" aria-label="Payment token"
+                    title="Payment token">
+                    <option value="ETH" selected>ETH</option>
+                    <option value="USDC">USDC</option>
+                </select>
+            </div>
+            <button type="button" id="buyBtn" class="analyze-btn">MINT / BUY FRACTION</button>
+            <div id="loadingSpinner" class="loading-spinner hidden"></div>
+        </section>
+
+        <!-- Portfolio -->
+        <section class="section result-section" id="portfolioSection">
+            <h2 class="result-title">My Portfolio</h2>
+            <div class="result-box" id="portfolioBox">
+                <div style="font-size:10px; color:#b0b0b0;">Connect a wallet to load balances.</div>
+            </div>
+        </section>
+
+        <!-- AI valuation / audit -->
+        <section class="section">
+            <label class="label">AI Valuation (Gemini)</label>
+            <div class="input-group" style="margin-bottom:8px;">
+                <input type="password" id="geminiApiKey" class="input" placeholder="Gemini API key" autocomplete="off">
+                <button type="button" id="toggleGeminiKey" class="toggle-btn" title="Show/Hide">👁️</button>
+            </div>
+            <textarea id="assetPayload" class="input" rows="5"
+                placeholder="Paste asset JSON/text (deed, certificate, appraisal notes, etc.)"></textarea>
+            <button type="button" id="runValuationBtn" class="analyze-btn" style="margin-top:8px;">RUN AI
+                VALUATION</button>
+            <pre id="valuationOutput" class="input"
+                style="white-space:pre-wrap; margin-top:8px; font-size:10px;">(valuation output)</pre>
+        </section>
+
+        <!-- Auditor / Owner actions -->
+        <section class="section">
+            <label class="label">On-chain Actions (Auditor / Owner)</label>
+            <div class="input-group" style="margin-bottom:8px;">
+                <input type="text" id="auditorAddress" class="input" placeholder="Auditor address (0x...)"
                     autocomplete="off">
-                <button type="button" id="toggleApiKey" class="toggle-btn" title="Show/Hide">👁️</button>
+                <button type="button" id="setAuditorBtn" class="toggle-btn">Set Auditor</button>
             </div>
-            <small class="hint">Saved locally. Never sent anywhere except Google.</small>
-        </section>
-
-        <!-- Live Market Data API Configuration -->
-        <section class="section">
-            <label for="marketDataApiKey" class="label">🔴 Live Market Data (Finnhub)</label>
-            <div class="input-group">
-                <input type="password" id="marketDataApiKey" class="input"
-                    placeholder="Finnhub API key for real-time data" autocomplete="off"
-                    value="d52k5hpr01qqu01vifsgd52k5hpr01qqu01vift0">
-                <button type="button" id="toggleMarketDataKey" class="toggle-btn" title="Show/Hide">👁️</button>
+            <small class="hint">Owner-only: authorize an auditor to verify/tokenize assets.</small>
+            <div class="input-group" style="margin-bottom:8px;">
+                <input type="number" id="appraisedValue" class="input" placeholder="Appraised value (uint)" min="0"
+                    step="1">
+                <input type="number" id="totalFractions" class="input" placeholder="Total fractions" min="1" step="1">
             </div>
-            <small class="hint">🔴 LIVE: Real-time quotes, news, and indicators from Finnhub.io (60 calls/min
-                free)</small>
-        </section>
+            <input type="text" id="tokenUri" class="input" placeholder="Token URI (ipfs://... or https://...)"
+                autocomplete="off" style="margin-bottom:8px;">
 
+            <button type="button" id="verifyTokenizeBtn" class="analyze-btn">VERIFY & TOKENIZE (AUDITOR)</button>
 
+<<<<<<< Updated upstream
 
 
 
@@ -66,8 +156,17 @@
                     <p><strong>Confidence:</strong> <span id="confidenceOutput">--</span></p>
                     <p><strong>Reason:</strong> <span id="reasonOutput">--</span></p>
                 </div>
+=======
+            <div class="input-group" style="margin-top:10px; margin-bottom:8px;">
+                <input type="text" id="buyWeiPerToken" class="input" placeholder="Buy price wei/token">
+                <input type="text" id="sellWeiPerToken" class="input" placeholder="Sell price wei/token">
+>>>>>>> Stashed changes
             </div>
-            <!-- Enhanced results will be dynamically added here -->
+            <div class="input-group" style="margin-bottom:8px;">
+                <input type="text" id="buyUsdcPerToken" class="input" placeholder="Buy price USDC/token (base units)">
+                <input type="text" id="sellUsdcPerToken" class="input" placeholder="Sell price USDC/token (base units)">
+            </div>
+            <button type="button" id="setPricesBtn" class="analyze-btn">SET MARKET PRICES (OWNER)</button>
         </section>
 
         <!-- Error Display -->
@@ -77,12 +176,12 @@
             </div>
         </section>
 
-        <!-- Footer -->
         <footer class="footer">
-            <p>v2.0.0 | Quantum Analysis | Olymp Trade Optimized</p>
+            <p>v2.0.0 | RWA Tokenization Dashboard</p>
         </footer>
     </div>
 
+    <script src="vendor/ethers.umd.min.js"></script>
     <script src="popup.js"></script>
 </body>
 

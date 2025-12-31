@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "QuantumTrader: Advanced AI Market Analysis",
+    "name": "QuantumTrader: RWA Tokenization Dashboard",
     "version": "2.0.0",
-    "description": "Advanced quantitative trading analysis with video capture, multi-timeframe analysis, and market data integration for Olymp Trade.",
+    "description": "Real-World Asset (RWA) tokenization dashboard with on-chain registry + fractional trading.",
     "icons": {
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",
@@ -10,16 +10,12 @@
     },
     "permissions": [
         "activeTab",
-        "storage",
-        "scripting",
-        "tabCapture",
-        "desktopCapture"
+        "storage"
     ],
     "host_permissions": [
         "https://generativelanguage.googleapis.com/*",
-        "https://olymptrade.com/*",
-        "https://*.olymptrade.com/*",
-        "https://finnhub.io/*"
+        "http://localhost/*",
+        "http://127.0.0.1/*"
     ],
     "action": {
         "default_popup": "popup.html",

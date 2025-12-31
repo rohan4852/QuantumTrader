@@ -214,34 +214,6 @@ body {
     overflow: hidden;
 }
 
-.analyze-btn::before {
-    content: '👻';
-    position: absolute;
-    left: 10px;
-    font-size: 14px;
-    animation: float 2s ease-in-out infinite;
-}
-
-.analyze-btn::after {
-    content: '🔮';
-    position: absolute;
-    right: 10px;
-    font-size: 14px;
-    animation: float 2s ease-in-out infinite 1s;
-}
-
-@keyframes float {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-3px);
-    }
-}
-
 .analyze-btn:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 6px 25px rgba(255, 107, 0, 0.7), 0 0 30px rgba(255, 107, 0, 0.5);

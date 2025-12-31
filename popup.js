@@ -1,47 +1,45 @@
 /**
- * AITrader - Chrome Extension
- * Passive Chart Analysis using Gemini AI
- * Manifest V3 Compliant | No Content Script Injection
+ * QuantumTrader (PS-004)
+ * RWA Tokenization Dashboard
+ *
+ * Popup responsibilities (MV3 extension page):
+ * - Connect a wallet (dev-friendly)
+ * - Read assets from AssetRegistry
+ * - Buy fractions via Marketplace
+ * - Show basic ERC-1155 portfolio balances
+ * - Use Gemini to produce an audit/valuation payload (off-chain), then allow sending it on-chain
  */
 
-// ============================================================================
-// QUANTITATIVE ANALYSIS SYSTEM PROMPT - OLYMP TRADE FOCUSED
-// ============================================================================
-const QUANTITATIVE_SYSTEM_PROMPT = `You are a SPEED-OPTIMIZED quantitative trading analyst for OLYMP TRADE binary options.
-Provide INSTANT, HIGH-ACCURACY predictions in minimal time.
+/* global chrome, ethers */
 
-ULTRA-FAST ANALYSIS PROTOCOL:
-1. IMMEDIATE VISUAL SCAN (2 seconds max):
-   - Instant trend identification: UP/DOWN/SIDEWAYS
-   - Quick pattern recognition: Breakout/Rejection/Consolidation
-   - Rapid support/resistance identification
+// ---------------------------
+// ABIs (minimal)
+// ---------------------------
 
-2. LIVE DATA INTEGRATION (1 second max):
-   - RSI: >50 = Bullish bias, <50 = Bearish bias
-   - MACD: Positive = UP momentum, Negative = DOWN momentum
-   - Price vs Bollinger Middle: Above = BUY bias, Below = SELL bias
-   - Current momentum direction: BULLISH/BEARISH
+const ABI_ASSET_REGISTRY = [
+    'function nextAssetId() view returns (uint256)',
+    'function registerAsset(string detailsURI) returns (uint256)',
+    'function setAuditor(address auditor, bool allowed)',
+    'function verifyAndTokenizeAsset(uint256 assetId, uint256 appraisedValue, uint256 totalFractions, string tokenUri)',
+    'function assets(uint256 assetId) view returns (uint256 assetId_, address issuer, string detailsURI, bool verified, address auditor, uint256 appraisedValue, uint256 totalFractions, uint256 verifiedAt)',
+];
 
-3. LIGHTNING-FAST DECISION MATRIX:
-   ⚡ INSTANT BUY SIGNALS:
-   - Visual: Clear upward movement + Live: RSI >50 + MACD positive + Price rising
-   - Confidence: HIGH if all align, MEDIUM if 3/4 align
-   
-   ⚡ INSTANT SELL SIGNALS:
-   - Visual: Clear downward movement + Live: RSI <50 + MACD negative + Price falling
-   - Confidence: HIGH if all align, MEDIUM if 3/4 align
-   
-   ⚡ INSTANT NO TRADE:
-   - Mixed signals (2/4 or less alignment)
-   - Extreme RSI (>80 or <20) without momentum confirmation
-   - Sideways/ranging price action
+const ABI_RWA_TOKEN = [
+    'function balanceOf(address account, uint256 id) view returns (uint256)',
+    'function isApprovedForAll(address account, address operator) view returns (bool)',
+    'function setApprovalForAll(address operator, bool approved)',
+];
 
-SPEED-OPTIMIZED RULES:
-- Analysis time: <5 seconds total
-- Decision confidence: Based on signal alignment (4/4=HIGH, 3/4=MEDIUM, <3=NO TRADE)
-- Duration: 5-15 minutes for high volatility, 15-30 minutes for normal volatility
-- Risk: HIGH if news within 30min, MEDIUM if volatility >average, LOW otherwise
+const ABI_MARKETPLACE = [
+    'function prices(uint256 assetId) view returns (uint256 buyWeiPerToken, uint256 sellWeiPerToken, uint256 buyUsdcPerToken, uint256 sellUsdcPerToken)',
+    'function buyWithETH(uint256 assetId, uint256 amount) payable',
+    'function buyWithUSDC(uint256 assetId, uint256 amount)',
+    'function sellForETH(uint256 assetId, uint256 amount)',
+    'function sellForUSDC(uint256 assetId, uint256 amount)',
+    'function setAssetPrices(uint256 assetId, uint256 buyWeiPerToken, uint256 sellWeiPerToken, uint256 buyUsdcPerToken, uint256 sellUsdcPerToken)',
+];
 
+<<<<<<< Updated upstream
 INSTANT OUTPUT (JSON ONLY - NO EXPLANATIONS):
 {
   "decision": "BET UP" | "BET DOWN" | "NO TRADE",
@@ -105,920 +103,197 @@ StocksTxtCatalog._supportedAssetsTextPromise = null;
 // ============================================================================
 // DOM ELEMENTS
 // ============================================================================
+=======
+const ABI_ERC20 = [
+    'function allowance(address owner, address spender) view returns (uint256)',
+    'function approve(address spender, uint256 amount) returns (bool)',
+    'function decimals() view returns (uint8)',
+];
+
+// ---------------------------
+// DOM
+// ---------------------------
+
+>>>>>>> Stashed changes
 const DOM = {
-    // API Keys
-    apiKeyInput: document.getElementById('apiKey'),
-    toggleApiKeyBtn: document.getElementById('toggleApiKey'),
-    marketDataApiKey: document.getElementById('marketDataApiKey'),
-    toggleMarketDataKey: document.getElementById('toggleMarketDataKey'),
+    walletStatus: document.getElementById('walletStatus'),
+    connectWalletBtn: document.getElementById('connectWalletBtn'),
 
+    rpcUrl: document.getElementById('rpcUrl'),
+    privateKey: document.getElementById('privateKey'),
+    togglePrivateKey: document.getElementById('togglePrivateKey'),
 
-    // Configuration
-    captureMode: document.getElementById('captureMode'),
+    registryAddress: document.getElementById('registryAddress'),
+    tokenAddress: document.getElementById('tokenAddress'),
+    marketplaceAddress: document.getElementById('marketplaceAddress'),
+    usdcAddress: document.getElementById('usdcAddress'),
 
-    // Controls
-    analyzeBtn: document.getElementById('analyzeBtn'),
+    detailsUri: document.getElementById('detailsUri'),
+    registerAssetBtn: document.getElementById('registerAssetBtn'),
+
+    assetSelect: document.getElementById('assetSelect'),
+    refreshAssetsBtn: document.getElementById('refreshAssetsBtn'),
+
+    buyAmount: document.getElementById('buyAmount'),
+    buyPayment: document.getElementById('buyPayment'),
+    buyBtn: document.getElementById('buyBtn'),
+
+    portfolioBox: document.getElementById('portfolioBox'),
+
+    geminiApiKey: document.getElementById('geminiApiKey'),
+    toggleGeminiKey: document.getElementById('toggleGeminiKey'),
+    assetPayload: document.getElementById('assetPayload'),
+    runValuationBtn: document.getElementById('runValuationBtn'),
+    valuationOutput: document.getElementById('valuationOutput'),
+
+    appraisedValue: document.getElementById('appraisedValue'),
+    totalFractions: document.getElementById('totalFractions'),
+    tokenUri: document.getElementById('tokenUri'),
+    verifyTokenizeBtn: document.getElementById('verifyTokenizeBtn'),
+
+    auditorAddress: document.getElementById('auditorAddress'),
+    setAuditorBtn: document.getElementById('setAuditorBtn'),
+
+    buyWeiPerToken: document.getElementById('buyWeiPerToken'),
+    sellWeiPerToken: document.getElementById('sellWeiPerToken'),
+    buyUsdcPerToken: document.getElementById('buyUsdcPerToken'),
+    sellUsdcPerToken: document.getElementById('sellUsdcPerToken'),
+    setPricesBtn: document.getElementById('setPricesBtn'),
+
     loadingSpinner: document.getElementById('loadingSpinner'),
 
-    // Results
-    resultSection: document.getElementById('resultSection'),
-    decisionOutput: document.getElementById('decisionOutput'),
-    confidenceOutput: document.getElementById('confidenceOutput'),
-    confidencePercentageOutput: document.getElementById('confidencePercentageOutput'),
-    reasonOutput: document.getElementById('reasonOutput'),
-
-    // Errors
     errorSection: document.getElementById('errorSection'),
-    errorMessage: document.getElementById('errorMessage')
+    errorMessage: document.getElementById('errorMessage'),
+}
+
+async function setAuditor() {
+    clearError();
+
+    try {
+        setLoading(true);
+        await persistFormSettings();
+
+        const auditor = (DOM.auditorAddress.value || '').trim();
+        if (!auditor) throw new Error('Auditor address is required');
+
+        const registry = getRegistry(false);
+        const tx = await registry.setAuditor(auditor, true);
+        await tx.wait();
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
+    }
 };
 
-// ============================================================================
-// ENHANCED STORAGE MANAGEMENT
-// ============================================================================
+// ---------------------------
+// State
+// ---------------------------
+
+const DEFAULTS = {
+    rpcUrl: 'http://127.0.0.1:8545',
+};
+
+const STATE = {
+    provider: null,
+    signer: null,
+    walletAddress: null,
+    assets: [],
+};
+
+// ---------------------------
+// Storage
+// ---------------------------
+
 class StorageManager {
-    static async saveApiKeys(keys) {
-        try {
-            await chrome.storage.local.set({
-                geminiApiKey: keys.gemini || '',
-                marketDataApiKey: keys.marketData || ''
-            });
-        } catch (error) {
-            console.error('Error saving API keys:', error);
-        }
+    static async load() {
+        const res = await chrome.storage.local.get([
+            'rpcUrl',
+            'privateKey',
+            'registryAddress',
+            'tokenAddress',
+            'marketplaceAddress',
+            'usdcAddress',
+            'geminiApiKey',
+        ]);
+
+        return {
+            rpcUrl: res.rpcUrl || DEFAULTS.rpcUrl,
+            privateKey: res.privateKey || '',
+            registryAddress: res.registryAddress || '',
+            tokenAddress: res.tokenAddress || '',
+            marketplaceAddress: res.marketplaceAddress || '',
+            usdcAddress: res.usdcAddress || '',
+            geminiApiKey: res.geminiApiKey || '',
+        };
     }
 
-    static async loadApiKeys() {
-        try {
-            const result = await chrome.storage.local.get([
-                'geminiApiKey',
-                'marketDataApiKey'
-            ]);
-            return {
-                gemini: result.geminiApiKey || '',
-                marketData: result.marketDataApiKey || ''
-            };
-        } catch (error) {
-            console.error('Error loading API keys:', error);
-            return { gemini: '', marketData: '' };
-        }
-    }
-
-    static async saveAnalysisConfig(config) {
-        try {
-            await chrome.storage.local.set({
-                captureMode: config.captureMode
-            });
-        } catch (error) {
-            console.error('Error saving analysis config:', error);
-        }
-    }
-
-    static async loadAnalysisConfig() {
-        try {
-            const result = await chrome.storage.local.get([
-                'captureMode'
-            ]);
-            return {
-                captureMode: result.captureMode || 'video'
-            };
-        } catch (error) {
-            console.error('Error loading analysis config:', error);
-            return {
-                captureMode: 'video'
-            };
-        }
-    }
-
-    // Legacy methods for backward compatibility
-    static async saveApiKey(apiKey) {
-        await this.saveApiKeys({ gemini: apiKey });
-    }
-
-    static async loadApiKey() {
-        const keys = await this.loadApiKeys();
-        return keys.gemini;
+    static async save(partial) {
+        await chrome.storage.local.set(partial);
     }
 }
 
-// ============================================================================
-// ADVANCED CAPTURE SYSTEM - VIDEO & MULTI-FRAME
-// ============================================================================
-class AdvancedCapture {
-    static async captureVideo(durationSeconds = 5) {
-        try {
-            console.log(`Starting ${durationSeconds}s video capture...`);
+// ---------------------------
+// UI helpers
+// ---------------------------
 
-            // Get current active tab
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+function setLoading(isLoading) {
+    DOM.loadingSpinner.classList.toggle('hidden', !isLoading);
+    DOM.buyBtn.disabled = isLoading;
+    DOM.registerAssetBtn.disabled = isLoading;
+    DOM.refreshAssetsBtn.disabled = isLoading;
+    DOM.runValuationBtn.disabled = isLoading;
+    DOM.verifyTokenizeBtn.disabled = isLoading;
+    DOM.setPricesBtn.disabled = isLoading;
+}
 
-            // Start screen capture
-            const stream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    mediaSource: 'tab',
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                    frameRate: { ideal: 30 }
-                },
-                audio: false
-            });
+function showError(message) {
+    DOM.errorMessage.textContent = message;
+    DOM.errorSection.classList.remove('hidden');
+}
 
-            const mediaRecorder = new MediaRecorder(stream, {
-                mimeType: 'video/webm;codecs=vp9'
-            });
+function clearError() {
+    DOM.errorMessage.textContent = '';
+    DOM.errorSection.classList.add('hidden');
+}
 
-            const chunks = [];
+function setWalletStatus(text) {
+    DOM.walletStatus.textContent = text;
+}
 
-            return new Promise((resolve, reject) => {
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        chunks.push(event.data);
-                    }
-                };
+function togglePasswordInput(inputEl) {
+    inputEl.type = inputEl.type === 'password' ? 'text' : 'password';
+}
 
-                mediaRecorder.onstop = async () => {
-                    try {
-                        const blob = new Blob(chunks, { type: 'video/webm' });
-                        const videoBase64 = await this.blobToBase64(blob);
+function normalizeAddress(value) {
+    const v = (value || '').trim();
+    return v;
+}
 
-                        // Stop all tracks
-                        stream.getTracks().forEach(track => track.stop());
+// ---------------------------
+// Ethers helpers
+// ---------------------------
 
-                        resolve(videoBase64);
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-
-                mediaRecorder.onerror = (error) => {
-                    stream.getTracks().forEach(track => track.stop());
-                    reject(error);
-                };
-
-                // Start recording
-                mediaRecorder.start();
-
-                // Stop after specified duration
-                setTimeout(() => {
-                    if (mediaRecorder.state === 'recording') {
-                        mediaRecorder.stop();
-                    }
-                }, durationSeconds * 1000);
-            });
-
-        } catch (error) {
-            console.error('Error capturing video:', error);
-            throw new Error('Failed to capture video. Please ensure screen sharing is allowed.');
-        }
-    }
-
-    static async captureMultiFrame(frameCount = 5, intervalMs = 2000) {
-        try {
-            console.log(`Capturing ${frameCount} frames with ${intervalMs}ms intervals...`);
-            const frames = [];
-
-            for (let i = 0; i < frameCount; i++) {
-                const dataUrl = await chrome.tabs.captureVisibleTab({
-                    format: 'jpeg',
-                    quality: 95
-                });
-
-                frames.push({
-                    timestamp: Date.now(),
-                    data: this.convertDataUrlToBase64(dataUrl),
-                    frameNumber: i + 1
-                });
-
-                // Wait before next capture (except for last frame)
-                if (i < frameCount - 1) {
-                    await this.sleep(intervalMs);
-                }
-            }
-
-            return frames;
-        } catch (error) {
-            console.error('Error capturing multi-frame:', error);
-            throw new Error('Failed to capture multiple frames.');
-        }
-    }
-
-    static async captureScreenshot() {
-        try {
-            const dataUrl = await chrome.tabs.captureVisibleTab({
-                format: 'jpeg',
-                quality: 95
-            });
-            return dataUrl;
-        } catch (error) {
-            console.error('Error capturing screenshot:', error);
-            throw new Error('Failed to capture chart image. Ensure a tab is active.');
-        }
-    }
-
-    static convertDataUrlToBase64(dataUrl) {
-        try {
-            return dataUrl.split(',')[1];
-        } catch (error) {
-            console.error('Error converting image to base64:', error);
-            throw new Error('Failed to process image data.');
-        }
-    }
-
-    static async blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const base64 = reader.result.split(',')[1];
-                resolve(base64);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    }
-
-    static sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    // Create fallback market context when Finnhub completely fails
-    static createFallbackMarketContext(symbol) {
-        console.log(`🔄 Creating fallback context for ${symbol} - Finnhub unavailable`);
-        return {
-            symbol: symbol,
-            timestamp: new Date().toISOString(),
-            live: null,
-            technical: null,
-            sentiment: {
-                news: null,
-                newsCount: 0
-            },
-            fallback: true,
-            message: 'Live market data unavailable - proceeding with visual analysis only'
-        };
-    }
-
-    // Helper functions for Finnhub integration
-    static formatSymbolForFinnhub(symbol) {
-        // Convert EURUSD to OANDA:EUR_USD format for Finnhub
-        if (symbol.length === 6) {
-            return `OANDA:${symbol.slice(0, 3)}_${symbol.slice(3, 6)}`;
-        }
-        return symbol;
-    }
-
-    static convertTimeframeForFinnhub(timeframe) {
-        const mapping = {
-            '1m': '1',
-            '5m': '5',
-            '15m': '15',
-            '30m': '30',
-            '1h': '60',
-            '4h': '240',
-            '1d': 'D'
-        };
-        return mapping[timeframe] || '60';
-    }
-
-    static filterRelevantNews(news, symbol) {
-        if (!news || !Array.isArray(news)) return null;
-
-        const currency1 = symbol.slice(0, 3).toLowerCase();
-        const currency2 = symbol.slice(3, 6).toLowerCase();
-
-        return news.filter(item => {
-            const text = (item.summary + ' ' + item.headline).toLowerCase();
-            return text.includes(currency1) ||
-                text.includes(currency2) ||
-                text.includes('forex') ||
-                text.includes('fed') ||
-                text.includes('ecb') ||
-                text.includes('central bank');
-        }).slice(0, 5); // Top 5 relevant news items
-    }
-
-    static calculateTechnicalIndicators(candles) {
-        const closes = candles.map(c => c.close);
-        const highs = candles.map(c => c.high);
-        const lows = candles.map(c => c.low);
-        const volumes = candles.map(c => c.volume || 1000);
-
-        return {
-            rsi: this.calculateRSI(closes, 14),
-            macd: this.calculateMACD(closes),
-            bollinger: this.calculateBollingerBands(closes, 20, 2),
-            atr: this.calculateATR(highs, lows, closes, 14),
-            sma20: this.calculateSMA(closes, 20),
-            ema12: this.calculateEMA(closes, 12),
-            ema26: this.calculateEMA(closes, 26),
-            support: Math.min(...lows.slice(-20)),
-            resistance: Math.max(...highs.slice(-20)),
-            trend: this.determineTrend(closes)
-        };
-    }
-
-    static calculateMarketMomentum(liveQuote, recentCandles) {
-        const lastCandle = recentCandles[recentCandles.length - 1];
-        const prevCandle = recentCandles[recentCandles.length - 2];
-
-        return {
-            priceVelocity: (liveQuote.price - lastCandle.close) / lastCandle.close,
-            candleMomentum: (lastCandle.close - prevCandle.close) / prevCandle.close,
-            gapFromOpen: (liveQuote.price - lastCandle.open) / lastCandle.open,
-            direction: liveQuote.price > lastCandle.close ? 'BULLISH' : 'BEARISH'
-        };
-    }
-
-    static calculateSMA(prices, period) {
-        if (prices.length < period) return null;
-        const sum = prices.slice(-period).reduce((a, b) => a + b, 0);
-        return sum / period;
-    }
-
-    static determineTrend(prices) {
-        if (prices.length < 10) return 'UNKNOWN';
-
-        const recent = prices.slice(-10);
-        const older = prices.slice(-20, -10);
-
-        const recentAvg = recent.reduce((a, b) => a + b) / recent.length;
-        const olderAvg = older.reduce((a, b) => a + b) / older.length;
-
-        if (recentAvg > olderAvg * 1.001) return 'BULLISH';
-        if (recentAvg < olderAvg * 0.999) return 'BEARISH';
-        return 'SIDEWAYS';
+function ensureEthersLoaded() {
+    if (typeof ethers === 'undefined') {
+        throw new Error('ethers library not loaded. Ensure vendor/ethers.umd.min.js exists and is referenced in popup.html.');
     }
 }
 
-// ============================================================================
-// LIVE MARKET DATA API INTEGRATION - FINNHUB REAL-TIME
-// ============================================================================
-class LiveMarketDataAPI {
-    static async getLiveOlympTradeData(symbol, timeframe, apiKey) {
-        try {
-            // Use your Finnhub API key if no key provided
-            const finnhubKey = apiKey || 'd52k5hpr01qqu01vifsgd52k5hpr01qqu01vift0';
+function getProvider() {
+    ensureEthersLoaded();
 
-            console.log(`🔴 LIVE: Getting real-time data for ${symbol} (${timeframe})`);
-
-            // Use Promise.allSettled to handle individual failures gracefully
-            const results = await Promise.allSettled([
-                this.getFinnhubLiveQuoteWithRetry(symbol, finnhubKey),
-                this.getFinnhubCandlesWithRetry(symbol, timeframe, finnhubKey),
-                this.getFinnhubNewsWithRetry(symbol, finnhubKey)
-            ]);
-
-            // Extract results, handling failures gracefully
-            const liveQuote = results[0].status === 'fulfilled' ? results[0].value : null;
-            const recentCandles = results[1].status === 'fulfilled' ? results[1].value : null;
-            const marketNews = results[2].status === 'fulfilled' ? results[2].value : null;
-
-            // Log what we successfully retrieved
-            console.log(`📊 Live Quote: ${liveQuote ? '✅ Success' : '❌ Failed'}`);
-            console.log(`📈 Candles: ${recentCandles ? '✅ Success' : '❌ Failed'}`);
-            console.log(`📰 News: ${marketNews ? '✅ Success' : '❌ Failed'}`);
-
-            // Create market context even with partial data
-            const context = this.createMarketContext(symbol, liveQuote, recentCandles, marketNews);
-
-            if (!liveQuote && !recentCandles && !marketNews) {
-                console.warn('⚠️ All Finnhub APIs failed, creating fallback context');
-                return this.createFallbackMarketContext(symbol);
-            }
-
-            return context;
-
-        } catch (error) {
-            console.error('❌ Complete Finnhub failure:', error);
-            // Always return something so analysis can proceed
-            return this.createFallbackMarketContext(symbol);
-        }
+    const rpcUrl = (DOM.rpcUrl.value || '').trim() || DEFAULTS.rpcUrl;
+    if (!rpcUrl) {
+        throw new Error('RPC URL is required');
     }
 
-    // Retry wrapper for live quote with exponential backoff
-    static async getFinnhubLiveQuoteWithRetry(symbol, apiKey, maxRetries = 3) {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`🔄 Attempt ${attempt}/${maxRetries}: Getting live quote for ${symbol}`);
-                const result = await this.getFinnhubLiveQuote(symbol, apiKey);
-                if (result) return result;
-
-                if (attempt < maxRetries) {
-                    const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-                    console.log(`⏳ Retrying in ${delay}ms...`);
-                    await this.sleep(delay);
-                }
-            } catch (error) {
-                console.warn(`❌ Attempt ${attempt} failed:`, error.message);
-                if (attempt === maxRetries) {
-                    console.error(`💥 All ${maxRetries} attempts failed for live quote`);
-                    return null;
-                }
-            }
-        }
-        return null;
-    }
-
-    // Retry wrapper for candles
-    static async getFinnhubCandlesWithRetry(symbol, timeframe, apiKey, maxRetries = 3) {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`🔄 Attempt ${attempt}/${maxRetries}: Getting candles for ${symbol}`);
-                const result = await this.getFinnhubCandles(symbol, timeframe, apiKey);
-                if (result && result.length > 0) return result;
-
-                if (attempt < maxRetries) {
-                    const delay = Math.pow(2, attempt) * 1000;
-                    console.log(`⏳ Retrying in ${delay}ms...`);
-                    await this.sleep(delay);
-                }
-            } catch (error) {
-                console.warn(`❌ Attempt ${attempt} failed:`, error.message);
-                if (attempt === maxRetries) {
-                    console.error(`💥 All ${maxRetries} attempts failed for candles`);
-                    return null;
-                }
-            }
-        }
-        return null;
-    }
-
-    // Retry wrapper for news
-    static async getFinnhubNewsWithRetry(symbol, apiKey, maxRetries = 2) {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`🔄 Attempt ${attempt}/${maxRetries}: Getting news for ${symbol}`);
-                const result = await this.getFinnhubNews(symbol, apiKey);
-                if (result) return result;
-
-                if (attempt < maxRetries) {
-                    const delay = Math.pow(2, attempt) * 1000;
-                    console.log(`⏳ Retrying in ${delay}ms...`);
-                    await this.sleep(delay);
-                }
-            } catch (error) {
-                console.warn(`❌ Attempt ${attempt} failed:`, error.message);
-                if (attempt === maxRetries) {
-                    console.error(`💥 All ${maxRetries} attempts failed for news`);
-                    return null;
-                }
-            }
-        }
-        return null;
-    }
-
-    // Get current live price from Finnhub (with timeout)
-    static async getFinnhubLiveQuote(symbol, apiKey) {
-        try {
-            const finnhubSymbol = this.formatSymbolForFinnhub(symbol);
-            const url = `https://finnhub.io/api/v1/quote?symbol=${finnhubSymbol}&token=${apiKey}`;
-
-            // Add timeout to prevent hanging
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'QuantumTrader/2.0'
-                }
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            // Validate response data
-            if (!data || typeof data.c !== 'number' || data.c <= 0) {
-                throw new Error('Invalid price data received from Finnhub');
-            }
-
-            console.log(`✅ Live ${symbol} price: ${data.c}`);
-            return {
-                symbol: symbol,
-                price: data.c,
-                change: data.d || 0,
-                changePercent: data.dp || 0,
-                high: data.h || data.c,
-                low: data.l || data.c,
-                open: data.o || data.c,
-                previousClose: data.pc || data.c,
-                timestamp: Date.now()
-            };
-
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.warn(`⏰ Finnhub quote timeout for ${symbol}`);
-            } else {
-                console.warn(`❌ Finnhub quote error for ${symbol}:`, error.message);
-            }
-            throw error; // Re-throw for retry mechanism
-        }
-    }
-
-    // Get recent candles from Finnhub
-    static async getFinnhubCandles(symbol, timeframe, apiKey) {
-        try {
-            const finnhubSymbol = this.formatSymbolForFinnhub(symbol);
-            const resolution = this.convertTimeframeForFinnhub(timeframe);
-            const to = Math.floor(Date.now() / 1000);
-            const from = to - (7 * 24 * 60 * 60); // Last 7 days
-
-            const url = `https://finnhub.io/api/v1/forex/candle?symbol=${finnhubSymbol}&resolution=${resolution}&from=${from}&to=${to}&token=${apiKey}`;
-
-            // Add timeout to prevent hanging
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'QuantumTrader/2.0'
-                }
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            // Validate candle data
-            if (!data || !data.c || !Array.isArray(data.c) || data.c.length === 0) {
-                throw new Error('No candle data received from Finnhub');
-            }
-
-            const candles = [];
-            for (let i = 0; i < data.c.length; i++) {
-                // Validate each candle
-                if (data.t[i] && data.o[i] && data.h[i] && data.l[i] && data.c[i]) {
-                    candles.push({
-                        timestamp: data.t[i] * 1000,
-                        open: data.o[i],
-                        high: data.h[i],
-                        low: data.l[i],
-                        close: data.c[i],
-                        volume: data.v[i] || 1000
-                    });
-                }
-            }
-
-            if (candles.length === 0) {
-                throw new Error('No valid candles after filtering');
-            }
-
-            console.log(`✅ Got ${candles.length} valid candles for ${symbol}`);
-            return candles.sort((a, b) => a.timestamp - b.timestamp);
-
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.warn(`⏰ Finnhub candles timeout for ${symbol}`);
-            } else {
-                console.warn(`❌ Finnhub candles error for ${symbol}:`, error.message);
-            }
-            throw error; // Re-throw for retry mechanism
-        }
-    }
-
-    // Get market news from Finnhub (with timeout and validation)
-    static async getFinnhubNews(symbol, apiKey) {
-        try {
-            const url = `https://finnhub.io/api/v1/news?category=forex&token=${apiKey}`;
-
-            // Add timeout to prevent hanging
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'QuantumTrader/2.0'
-                }
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const news = await response.json();
-
-            // Validate news data
-            if (!news || !Array.isArray(news)) {
-                throw new Error('Invalid news data received from Finnhub');
-            }
-
-            const relevantNews = this.filterRelevantNews(news, symbol);
-            if (relevantNews && relevantNews.length > 0) {
-                console.log(`✅ Found ${relevantNews.length} relevant news items for ${symbol}`);
-                return relevantNews;
-            } else {
-                console.log(`ℹ️ No relevant news found for ${symbol}`);
-                return null; // This is OK, not an error
-            }
-
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.warn(`⏰ Finnhub news timeout for ${symbol}`);
-            } else {
-                console.warn(`❌ Finnhub news error for ${symbol}:`, error.message);
-            }
-            throw error; // Re-throw for retry mechanism
-        }
-    }
-
-    // Create comprehensive market context for Gemini AI
-    static createMarketContext(symbol, liveQuote, recentCandles, marketNews) {
-        const context = {
-            symbol: symbol,
-            timestamp: new Date().toISOString(),
-
-            // Live market state
-            live: liveQuote,
-
-            // Technical analysis from recent candles
-            technical: null,
-
-            // Market sentiment from news
-            sentiment: {
-                news: marketNews,
-                newsCount: marketNews?.length || 0
-            }
-        };
-
-        // Calculate technical indicators if we have candle data
-        if (recentCandles && recentCandles.length >= 20) {
-            context.technical = this.calculateTechnicalIndicators(recentCandles);
-            console.log(`✅ Calculated technical indicators for ${symbol}`);
-        }
-
-        // Add market momentum analysis
-        if (liveQuote && recentCandles && recentCandles.length > 0) {
-            context.momentum = this.calculateMarketMomentum(liveQuote, recentCandles);
-        }
-
-        return context;
-    }
-
-    static processAlphaVantageData(data) {
-        try {
-            const timeSeries = data['Time Series FX (1min)'] || data['Time Series FX (5min)'] || data['Time Series FX (15min)'];
-            if (!timeSeries) return null;
-
-            const prices = [];
-            const volumes = [];
-            const highs = [];
-            const lows = [];
-
-            Object.values(timeSeries).forEach(candle => {
-                prices.push(parseFloat(candle['4. close']));
-                highs.push(parseFloat(candle['2. high']));
-                lows.push(parseFloat(candle['3. low']));
-                volumes.push(parseFloat(candle['5. volume'] || 1000)); // Forex doesn't have volume
-            });
-
-            return this.calculateIndicators(prices, volumes, highs, lows);
-        } catch (error) {
-            console.error('Error processing Alpha Vantage data:', error);
-            return null;
-        }
-    }
-
-    static processTwelveData(data) {
-        try {
-            if (!data.values) return null;
-
-            const prices = [];
-            const volumes = [];
-            const highs = [];
-            const lows = [];
-
-            data.values.forEach(candle => {
-                prices.push(parseFloat(candle.close));
-                highs.push(parseFloat(candle.high));
-                lows.push(parseFloat(candle.low));
-                volumes.push(parseFloat(candle.volume || 1000));
-            });
-
-            return this.calculateIndicators(prices, volumes, highs, lows);
-        } catch (error) {
-            console.error('Error processing Twelve Data:', error);
-            return null;
-        }
-    }
-
-    static processPolygonData(data) {
-        try {
-            if (!data.results) return null;
-
-            const prices = [];
-            const volumes = [];
-            const highs = [];
-            const lows = [];
-
-            data.results.forEach(candle => {
-                prices.push(candle.c); // close
-                highs.push(candle.h);  // high
-                lows.push(candle.l);   // low
-                volumes.push(candle.v || 1000); // volume
-            });
-
-            return this.calculateIndicators(prices, volumes, highs, lows);
-        } catch (error) {
-            console.error('Error processing Polygon data:', error);
-            return null;
-        }
-    }
-
-    static calculateIndicators(prices, volumes, highs, lows) {
-        if (prices.length < 20) return null;
-
-        return {
-            rsi: this.calculateRSI(prices, 14),
-            macd: this.calculateMACD(prices),
-            bollinger: this.calculateBollingerBands(prices, 20, 2),
-            atr: this.calculateATR(highs, lows, prices, 14),
-            volumeProfile: this.analyzeVolume(volumes),
-            priceVelocity: this.calculateVelocity(prices),
-            volatilityPercentile: this.calculateVolatilityPercentile(prices)
-        };
-    }
-
-    static processMarketData(rawData) {
-        try {
-            // Calculate quantitative indicators
-            const prices = rawData.c || []; // closing prices
-            const volumes = rawData.v || []; // volumes
-            const highs = rawData.h || []; // highs
-            const lows = rawData.l || []; // lows
-
-            if (prices.length < 20) return null;
-
-            return {
-                rsi: this.calculateRSI(prices, 14),
-                macd: this.calculateMACD(prices),
-                bollinger: this.calculateBollingerBands(prices, 20, 2),
-                atr: this.calculateATR(highs, lows, prices, 14),
-                volumeProfile: this.analyzeVolume(volumes),
-                priceVelocity: this.calculateVelocity(prices),
-                volatilityPercentile: this.calculateVolatilityPercentile(prices)
-            };
-        } catch (error) {
-            console.error('Error processing market data:', error);
-            return null;
-        }
-    }
-
-    static calculateRSI(prices, period = 14) {
-        if (prices.length < period + 1) return null;
-
-        let gains = 0, losses = 0;
-
-        // Calculate initial average gain/loss
-        for (let i = 1; i <= period; i++) {
-            const change = prices[i] - prices[i - 1];
-            if (change > 0) gains += change;
-            else losses -= change;
-        }
-
-        let avgGain = gains / period;
-        let avgLoss = losses / period;
-
-        // Calculate RSI for latest period
-        for (let i = period + 1; i < prices.length; i++) {
-            const change = prices[i] - prices[i - 1];
-            const gain = change > 0 ? change : 0;
-            const loss = change < 0 ? -change : 0;
-
-            avgGain = (avgGain * (period - 1) + gain) / period;
-            avgLoss = (avgLoss * (period - 1) + loss) / period;
-        }
-
-        const rs = avgGain / avgLoss;
-        return 100 - (100 / (1 + rs));
-    }
-
-    static calculateMACD(prices, fast = 12, slow = 26, signal = 9) {
-        if (prices.length < slow) return null;
-
-        const emaFast = this.calculateEMA(prices, fast);
-        const emaSlow = this.calculateEMA(prices, slow);
-        const macdLine = emaFast - emaSlow;
-
-        return {
-            macd: macdLine,
-            signal: this.calculateEMA([macdLine], signal),
-            histogram: macdLine - this.calculateEMA([macdLine], signal)
-        };
-    }
-
-    static calculateEMA(prices, period) {
-        if (prices.length === 0) return 0;
-
-        const multiplier = 2 / (period + 1);
-        let ema = prices[0];
-
-        for (let i = 1; i < prices.length; i++) {
-            ema = (prices[i] * multiplier) + (ema * (1 - multiplier));
-        }
-
-        return ema;
-    }
-
-    static calculateBollingerBands(prices, period = 20, stdDev = 2) {
-        if (prices.length < period) return null;
-
-        const recentPrices = prices.slice(-period);
-        const sma = recentPrices.reduce((a, b) => a + b) / period;
-
-        const variance = recentPrices.reduce((acc, price) => {
-            return acc + Math.pow(price - sma, 2);
-        }, 0) / period;
-
-        const standardDeviation = Math.sqrt(variance);
-
-        return {
-            upper: sma + (standardDeviation * stdDev),
-            middle: sma,
-            lower: sma - (standardDeviation * stdDev),
-            position: (prices[prices.length - 1] - (sma - standardDeviation * stdDev)) / (2 * standardDeviation * stdDev)
-        };
-    }
-
-    static calculateATR(highs, lows, closes, period = 14) {
-        if (highs.length < period + 1) return null;
-
-        const trueRanges = [];
-        for (let i = 1; i < highs.length; i++) {
-            const tr = Math.max(
-                highs[i] - lows[i],
-                Math.abs(highs[i] - closes[i - 1]),
-                Math.abs(lows[i] - closes[i - 1])
-            );
-            trueRanges.push(tr);
-        }
-
-        return trueRanges.slice(-period).reduce((a, b) => a + b) / period;
-    }
-
-    static analyzeVolume(volumes) {
-        if (volumes.length < 20) return null;
-
-        const avgVolume = volumes.slice(-20).reduce((a, b) => a + b) / 20;
-        const currentVolume = volumes[volumes.length - 1];
-
-        return {
-            current: currentVolume,
-            average: avgVolume,
-            ratio: currentVolume / avgVolume,
-            trend: currentVolume > avgVolume ? 'above' : 'below'
-        };
-    }
-
-    static calculateVelocity(prices) {
-        if (prices.length < 5) return null;
-
-        const recent = prices.slice(-5);
-        const changes = [];
-
-        for (let i = 1; i < recent.length; i++) {
-            changes.push((recent[i] - recent[i - 1]) / recent[i - 1]);
-        }
-
-        return changes.reduce((a, b) => a + b) / changes.length;
-    }
-
-    static calculateVolatilityPercentile(prices, lookback = 100) {
-        if (prices.length < lookback) return null;
-
-        const returns = [];
-        for (let i = 1; i < prices.length; i++) {
-            returns.push(Math.abs((prices[i] - prices[i - 1]) / prices[i - 1]));
-        }
-
-        const currentVol = returns.slice(-20).reduce((a, b) => a + b) / 20;
-        const historicalVols = [];
-
-        for (let i = 20; i < returns.length - 20; i++) {
-            const vol = returns.slice(i, i + 20).reduce((a, b) => a + b) / 20;
-            historicalVols.push(vol);
-        }
-
-        historicalVols.sort((a, b) => a - b);
-        const percentile = historicalVols.filter(vol => vol < currentVol).length / historicalVols.length;
-
-        return percentile * 100;
-    }
+    STATE.provider = new ethers.JsonRpcProvider(rpcUrl);
+    return STATE.provider;
 }
 
+<<<<<<< Updated upstream
 
 
 // ============================================================================
@@ -1213,39 +488,68 @@ class GeminiAPI {
             console.error('Response Parsing Error:', error);
             throw new Error(`Failed to parse analysis: ${error.message}`);
         }
+=======
+function getSignerOrThrow() {
+    if (!STATE.signer) {
+        throw new Error('Wallet not connected. Click Connect first.');
+>>>>>>> Stashed changes
     }
+    return STATE.signer;
 }
 
-// ============================================================================
-// ENHANCED UI MANAGER
-// ============================================================================
-class UIManager {
-    static showError(message) {
-        DOM.errorMessage.textContent = message;
-        DOM.errorSection.classList.remove('hidden');
-        DOM.resultSection.classList.add('hidden');
-    }
+function getRegistry(readonly = true) {
+    const address = normalizeAddress(DOM.registryAddress.value);
+    if (!address) throw new Error('AssetRegistry address is required');
+    const runner = readonly ? getProvider() : getSignerOrThrow();
+    return new ethers.Contract(address, ABI_ASSET_REGISTRY, runner);
+}
 
-    static hideError() {
-        DOM.errorSection.classList.add('hidden');
-    }
+function getToken(readonly = true) {
+    const address = normalizeAddress(DOM.tokenAddress.value);
+    if (!address) throw new Error('RealWorldAssetToken address is required');
+    const runner = readonly ? getProvider() : getSignerOrThrow();
+    return new ethers.Contract(address, ABI_RWA_TOKEN, runner);
+}
 
-    static showLoading(show = true, stage = 'analysis') {
-        if (show) {
-            DOM.loadingSpinner.classList.remove('hidden');
-            DOM.analyzeBtn.disabled = true;
+function getMarketplace(readonly = true) {
+    const address = normalizeAddress(DOM.marketplaceAddress.value);
+    if (!address) throw new Error('Marketplace address is required');
+    const runner = readonly ? getProvider() : getSignerOrThrow();
+    return new ethers.Contract(address, ABI_MARKETPLACE, runner);
+}
 
-            // Dynamic loading messages based on stage
-            const messages = {
-                'capture': '🔍 Verifying Olymp Trade Platform...',
-                'market-data': '📊 Fetching Live Market Data...',
-                'ai-analysis': '🤖 AI Analysis in Progress...',
-                'analysis': '🔮 Quantum Analysis...',
-                'complete': '✅ Analysis Complete'
-            };
+function getUsdc(readonly = true) {
+    const address = normalizeAddress(DOM.usdcAddress.value);
+    if (!address) throw new Error('USDC address is required (optional field currently empty)');
+    const runner = readonly ? getProvider() : getSignerOrThrow();
+    return new ethers.Contract(address, ABI_ERC20, runner);
+}
 
-            DOM.analyzeBtn.textContent = messages[stage] || messages.analysis;
+// ---------------------------
+// Core actions
+// ---------------------------
+
+async function connectWallet() {
+    clearError();
+
+    try {
+        setLoading(true);
+
+        // Always set up read provider
+        getProvider();
+
+        // Try injected wallet first
+        if (window.ethereum && window.ethereum.request) {
+            const browserProvider = new ethers.BrowserProvider(window.ethereum);
+            await browserProvider.send('eth_requestAccounts', []);
+            const signer = await browserProvider.getSigner();
+            const addr = await signer.getAddress();
+
+            STATE.signer = signer;
+            STATE.walletAddress = addr;
+            setWalletStatus(`Connected: ${addr.slice(0, 6)}…${addr.slice(-4)} (injected)`);
         } else {
+<<<<<<< Updated upstream
             DOM.loadingSpinner.classList.add('hidden');
             DOM.analyzeBtn.disabled = false;
             DOM.analyzeBtn.textContent = "🔮 QUANTUM ANALYSIS";
@@ -1326,58 +630,34 @@ class UIManager {
             if (analysis.liveData.priceChange) {
                 const changeColor = analysis.liveData.priceChange > 0 ? '#00ff88' : '#ff3366';
                 html += `<p><strong>Change:</strong> <span style="color: ${changeColor}">${analysis.liveData.priceChange} (${analysis.liveData.changePercent}%)</span></p>`;
+=======
+            // Dev fallback: local private key
+            const pk = (DOM.privateKey.value || '').trim();
+            if (!pk) {
+                STATE.signer = null;
+                STATE.walletAddress = null;
+                setWalletStatus('Disconnected (no injected wallet detected; provide dev private key)');
+                return;
+>>>>>>> Stashed changes
             }
-            if (analysis.liveData.dayHigh && analysis.liveData.dayLow) {
-                html += `<p><strong>Day Range:</strong> ${analysis.liveData.dayLow} - ${analysis.liveData.dayHigh}</p>`;
-            }
-            if (analysis.liveData.momentum) {
-                const momentumColor = analysis.liveData.momentum === 'BULLISH' ? '#00ff88' : '#ff3366';
-                html += `<p><strong>Momentum:</strong> <span style="color: ${momentumColor}">${analysis.liveData.momentum}</span></p>`;
-            }
-            html += '</div>';
+
+            const wallet = new ethers.Wallet(pk, STATE.provider);
+            STATE.signer = wallet;
+            STATE.walletAddress = await wallet.getAddress();
+            setWalletStatus(`Connected: ${STATE.walletAddress.slice(0, 6)}…${STATE.walletAddress.slice(-4)} (dev key)`);
         }
 
-        // Technical indicators
-        if (analysis.indicators) {
-            html += '<div class="indicators">';
-            html += '<h3>📈 Technical Indicators</h3>';
-            Object.entries(analysis.indicators).forEach(([key, value]) => {
-                if (value !== null && value !== undefined) {
-                    html += `<p><strong>${key.toUpperCase()}:</strong> ${value}</p>`;
-                }
-            });
-            html += '</div>';
-        }
-
-        // News sentiment
-        if (analysis.newsSentiment && analysis.newsSentiment.newsCount > 0) {
-            html += '<div class="news-sentiment">';
-            html += '<h3>📰 Market News</h3>';
-            html += `<p><strong>Relevant News:</strong> ${analysis.newsSentiment.newsCount} items</p>`;
-            if (analysis.newsSentiment.latestNews) {
-                analysis.newsSentiment.latestNews.forEach((news, index) => {
-                    html += `<p><strong>${index + 1}.</strong> ${news.headline}</p>`;
-                });
-            }
-            html += '</div>';
-        }
-
-        enhancedSection.innerHTML = html;
-    }
-
-    static updateLoadingProgress(progress, message) {
-        // Update loading progress if needed
-        const progressBar = document.getElementById('progressBar');
-        if (progressBar) {
-            progressBar.style.width = `${progress}%`;
-        }
-
-        if (message) {
-            DOM.analyzeBtn.textContent = message;
-        }
+        await refreshAssets();
+        await refreshPortfolio();
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
     }
 }
 
+<<<<<<< Updated upstream
 // ============================================================================
 // QUANTUM ANALYSIS ORCHESTRATOR
 // ============================================================================
@@ -2265,12 +1545,426 @@ DOM.toggleMarketDataKey.addEventListener('click', () => {
             captureMode: DOM.captureMode.value
         };
         await StorageManager.saveAnalysisConfig(config);
+=======
+async function persistFormSettings() {
+    await StorageManager.save({
+        rpcUrl: DOM.rpcUrl.value,
+        privateKey: DOM.privateKey.value,
+        registryAddress: DOM.registryAddress.value,
+        tokenAddress: DOM.tokenAddress.value,
+        marketplaceAddress: DOM.marketplaceAddress.value,
+        usdcAddress: DOM.usdcAddress.value,
+        geminiApiKey: DOM.geminiApiKey.value,
+>>>>>>> Stashed changes
     });
-});
+}
 
-// ============================================================================
-// EVENT LISTENER - Quantum Analysis Button
-// ============================================================================
-DOM.analyzeBtn.addEventListener('click', async () => {
-    await QuantumAnalysisOrchestrator.performAnalysis();
+async function registerAsset() {
+    clearError();
+    try {
+        setLoading(true);
+        await persistFormSettings();
+
+        const detailsURI = (DOM.detailsUri.value || '').trim();
+        if (!detailsURI) throw new Error('detailsURI is required');
+
+        const registry = getRegistry(false);
+        const tx = await registry.registerAsset(detailsURI);
+        await tx.wait();
+
+        DOM.detailsUri.value = '';
+        await refreshAssets();
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
+    }
+}
+
+async function refreshAssets() {
+    clearError();
+
+    try {
+        setLoading(true);
+        await persistFormSettings();
+
+        const registry = getRegistry(true);
+        const nextId = await registry.nextAssetId();
+        const maxId = Number(nextId) - 1;
+
+        const assets = [];
+        for (let id = 1; id <= maxId; id++) {
+            const a = await registry.assets(id);
+            assets.push({
+                assetId: Number(a.assetId_),
+                issuer: a.issuer,
+                detailsURI: a.detailsURI,
+                verified: a.verified,
+                auditor: a.auditor,
+                appraisedValue: a.appraisedValue,
+                totalFractions: a.totalFractions,
+                verifiedAt: a.verifiedAt,
+            });
+        }
+
+        STATE.assets = assets;
+        renderAssetSelect();
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
+    }
+}
+
+function renderAssetSelect() {
+    DOM.assetSelect.innerHTML = '';
+
+    if (!STATE.assets.length) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '(no assets registered)';
+        DOM.assetSelect.appendChild(opt);
+        return;
+    }
+
+    for (const a of STATE.assets) {
+        const opt = document.createElement('option');
+        opt.value = String(a.assetId);
+        const status = a.verified ? 'VERIFIED' : 'UNVERIFIED';
+        const valueText = a.verified ? ` | val=${a.appraisedValue}` : '';
+        opt.textContent = `#${a.assetId} | ${status}${valueText}`;
+        DOM.assetSelect.appendChild(opt);
+    }
+}
+
+async function refreshPortfolio() {
+    if (!STATE.walletAddress) {
+        DOM.portfolioBox.innerHTML = '<div style="font-size:10px; color:#b0b0b0;">Connect a wallet to load balances.</div>';
+        return;
+    }
+
+    clearError();
+
+    try {
+        setLoading(true);
+        await persistFormSettings();
+
+        const token = getToken(true);
+
+        const rows = [];
+        for (const a of STATE.assets) {
+            const bal = await token.balanceOf(STATE.walletAddress, a.assetId);
+            if (bal > 0n) {
+                rows.push({ assetId: a.assetId, balance: bal, detailsURI: a.detailsURI, verified: a.verified });
+            }
+        }
+
+        if (!rows.length) {
+            DOM.portfolioBox.innerHTML = '<div style="font-size:10px; color:#b0b0b0;">No fractions owned yet.</div>';
+            return;
+        }
+
+        DOM.portfolioBox.innerHTML = rows
+            .map(r => {
+                const badge = r.verified ? 'VERIFIED' : 'UNVERIFIED';
+                return `<div style="font-size:10px; margin-bottom:6px;"><strong>Asset #${r.assetId}</strong> (${badge}) — balance: <strong>${r.balance.toString()}</strong><br/><span style="color:#888;">${escapeHtml(r.detailsURI)}</span></div>`;
+            })
+            .join('');
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
+    }
+}
+
+async function buyFraction() {
+    clearError();
+
+    try {
+        setLoading(true);
+        await persistFormSettings();
+
+        const assetId = Number(DOM.assetSelect.value);
+        if (!assetId) throw new Error('Select an asset');
+
+        const amount = Number(DOM.buyAmount.value);
+        if (!Number.isFinite(amount) || amount <= 0) throw new Error('Enter a valid buy amount');
+
+        const market = getMarketplace(false);
+        const payment = DOM.buyPayment.value;
+
+        const p = await market.prices(assetId);
+
+        if (payment === 'ETH') {
+            const unit = BigInt(p.buyWeiPerToken);
+            if (unit === 0n) throw new Error('Marketplace buyWeiPerToken is not set for this asset');
+            const cost = unit * BigInt(amount);
+
+            const tx = await market.buyWithETH(assetId, amount, { value: cost });
+            await tx.wait();
+        } else {
+            // USDC
+            const unit = BigInt(p.buyUsdcPerToken);
+            if (unit === 0n) throw new Error('Marketplace buyUsdcPerToken is not set for this asset');
+            const cost = unit * BigInt(amount);
+
+            const usdc = getUsdc(false);
+            const marketAddr = normalizeAddress(DOM.marketplaceAddress.value);
+            const allowance = await usdc.allowance(STATE.walletAddress, marketAddr);
+
+            if (BigInt(allowance) < cost) {
+                const txA = await usdc.approve(marketAddr, cost);
+                await txA.wait();
+            }
+
+            const tx = await market.buyWithUSDC(assetId, amount);
+            await tx.wait();
+        }
+
+        await refreshPortfolio();
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
+    }
+}
+
+// ---------------------------
+// Gemini valuation (Phase 3 scaffolding)
+// ---------------------------
+
+function extractJson(text) {
+    // Try direct parse first
+    try {
+        return JSON.parse(text);
+    } catch {
+        // Try fenced ```json blocks
+        const m = text.match(/```json\s*([\s\S]*?)\s*```/i) || text.match(/```\s*([\s\S]*?)\s*```/i);
+        if (m) {
+            return JSON.parse(m[1]);
+        }
+    }
+    throw new Error('Gemini response was not valid JSON');
+}
+
+async function runGeminiValuation() {
+    clearError();
+
+    try {
+        setLoading(true);
+        await persistFormSettings();
+
+        const apiKey = (DOM.geminiApiKey.value || '').trim();
+        if (!apiKey) throw new Error('Gemini API key is required');
+
+        const payload = (DOM.assetPayload.value || '').trim();
+        if (!payload) throw new Error('Paste asset JSON/text first');
+
+        const prompt = `You are an RWA auditor.
+
+Return ONLY strict JSON (no markdown, no code fences) with this schema:
+
+{
+  "appraisedValue": <uint>,
+  "appraisedValueUnit": "USD_CENTS",
+  "totalFractions": <uint>,
+  "tokenUri": "ipfs://... or https://...",
+  "buyWeiPerToken": <uint>,
+  "sellWeiPerToken": <uint>,
+  "buyUsdcPerToken": <uint>,
+  "sellUsdcPerToken": <uint>,
+  "riskSummary": "one paragraph",
+  "assumptions": ["..."],
+  "redFlags": ["..."]
+}
+
+Rules:
+- appraisedValueUnit MUST be USD_CENTS.
+- Use integer values only.
+- totalFractions should usually be 100000 unless the asset data strongly suggests otherwise.
+- Ensure buy price > sell price (positive spread).
+
+Asset data:
+${payload}`;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [{ text: prompt }],
+                    },
+                ],
+                generationConfig: {
+                    temperature: 0.2,
+                },
+            }),
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Gemini error (${res.status}): ${text.slice(0, 200)}`);
+        }
+
+        const data = await res.json();
+        const textOut = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('\n') || '';
+        const json = extractJson(textOut);
+
+        DOM.valuationOutput.textContent = JSON.stringify(json, null, 2);
+
+        // Fill fields to make on-chain actions easy
+        if (typeof json.appraisedValue !== 'undefined') DOM.appraisedValue.value = String(json.appraisedValue);
+        if (typeof json.totalFractions !== 'undefined') DOM.totalFractions.value = String(json.totalFractions);
+        if (typeof json.tokenUri !== 'undefined') DOM.tokenUri.value = String(json.tokenUri);
+        if (typeof json.buyWeiPerToken !== 'undefined') DOM.buyWeiPerToken.value = String(json.buyWeiPerToken);
+        if (typeof json.sellWeiPerToken !== 'undefined') DOM.sellWeiPerToken.value = String(json.sellWeiPerToken);
+        if (typeof json.buyUsdcPerToken !== 'undefined') DOM.buyUsdcPerToken.value = String(json.buyUsdcPerToken);
+        if (typeof json.sellUsdcPerToken !== 'undefined') DOM.sellUsdcPerToken.value = String(json.sellUsdcPerToken);
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
+    }
+}
+
+async function verifyAndTokenize() {
+    clearError();
+
+    try {
+        setLoading(true);
+        await persistFormSettings();
+
+        const assetId = Number(DOM.assetSelect.value);
+        if (!assetId) throw new Error('Select an asset');
+
+        const appraisedValue = BigInt(DOM.appraisedValue.value || '0');
+        const totalFractions = BigInt(DOM.totalFractions.value || '0');
+        const tokenUri = (DOM.tokenUri.value || '').trim();
+
+        if (totalFractions <= 0n) throw new Error('totalFractions must be > 0');
+        if (!tokenUri) throw new Error('tokenUri is required');
+
+        const registry = getRegistry(false);
+        const tx = await registry.verifyAndTokenizeAsset(assetId, appraisedValue, totalFractions, tokenUri);
+        await tx.wait();
+
+        await refreshAssets();
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
+    }
+}
+
+async function setMarketPrices() {
+    clearError();
+
+    try {
+        setLoading(true);
+        await persistFormSettings();
+
+        const assetId = Number(DOM.assetSelect.value);
+        if (!assetId) throw new Error('Select an asset');
+
+        const buyWei = BigInt(DOM.buyWeiPerToken.value || '0');
+        const sellWei = BigInt(DOM.sellWeiPerToken.value || '0');
+        const buyUsdc = BigInt(DOM.buyUsdcPerToken.value || '0');
+        const sellUsdc = BigInt(DOM.sellUsdcPerToken.value || '0');
+
+        const market = getMarketplace(false);
+        const tx = await market.setAssetPrices(assetId, buyWei, sellWei, buyUsdc, sellUsdc);
+        await tx.wait();
+    } catch (err) {
+        console.error(err);
+        showError(err?.message || String(err));
+    } finally {
+        setLoading(false);
+    }
+}
+
+// ---------------------------
+// Misc
+// ---------------------------
+
+function escapeHtml(s) {
+    return String(s || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+// ---------------------------
+// Init
+// ---------------------------
+
+async function init() {
+    clearError();
+    setLoading(false);
+
+    // Restore settings
+    const settings = await StorageManager.load();
+
+    DOM.rpcUrl.value = settings.rpcUrl;
+    DOM.privateKey.value = settings.privateKey;
+    DOM.registryAddress.value = settings.registryAddress;
+    DOM.tokenAddress.value = settings.tokenAddress;
+    DOM.marketplaceAddress.value = settings.marketplaceAddress;
+    DOM.usdcAddress.value = settings.usdcAddress;
+    DOM.geminiApiKey.value = settings.geminiApiKey;
+
+    // Set read provider early
+    try {
+        getProvider();
+        setWalletStatus('Disconnected');
+        await refreshAssets();
+    } catch {
+        // ignore on init
+    }
+
+    // Wire listeners
+    DOM.connectWalletBtn.addEventListener('click', connectWallet);
+    DOM.refreshAssetsBtn.addEventListener('click', refreshAssets);
+    DOM.registerAssetBtn.addEventListener('click', registerAsset);
+    DOM.buyBtn.addEventListener('click', buyFraction);
+    DOM.assetSelect.addEventListener('change', refreshPortfolio);
+
+    DOM.togglePrivateKey.addEventListener('click', () => togglePasswordInput(DOM.privateKey));
+    DOM.toggleGeminiKey.addEventListener('click', () => togglePasswordInput(DOM.geminiApiKey));
+
+    DOM.runValuationBtn.addEventListener('click', runGeminiValuation);
+    DOM.verifyTokenizeBtn.addEventListener('click', verifyAndTokenize);
+    DOM.setPricesBtn.addEventListener('click', setMarketPrices);
+    DOM.setAuditorBtn.addEventListener('click', setAuditor);
+
+    // Persist on input changes (best effort)
+    for (const el of [
+        DOM.rpcUrl,
+        DOM.privateKey,
+        DOM.registryAddress,
+        DOM.tokenAddress,
+        DOM.marketplaceAddress,
+        DOM.usdcAddress,
+        DOM.geminiApiKey,
+    ]) {
+        el.addEventListener('change', () => {
+            persistFormSettings().catch(() => undefined);
+        });
+    }
+}
+
+init().catch((err) => {
+    console.error(err);
+    showError(err?.message || String(err));
 });
